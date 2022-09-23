@@ -10,7 +10,7 @@ namespace st7796s {
 class ST7796S : public PollingComponent,
                public display::DisplayBuffer,
                public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING,
-                                     spi::DATA_RATE_8MHZ> {
+                                     spi::DATA_RATE_10MHZ> {
  public:
   ST7796S(int width, int height, int colstart, int rowstart, bool eightbitcolor, bool usebgr,
          bool invert_colors);
@@ -57,7 +57,7 @@ class ST7796S : public PollingComponent,
   bool eightbitcolor_ = false;
   bool usebgr_ = false;
   bool invert_colors_ = false;
-  int16_t width_ = 80, height_ = 80;  // Watch heap size
+  int16_t width_ = 240, height_ = 240;  // Watch heap size
 
   GPIOPin *reset_pin_{nullptr};
   GPIOPin *dc_pin_{nullptr};

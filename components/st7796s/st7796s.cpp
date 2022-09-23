@@ -2,6 +2,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/hal.h"
+#include "esphome/components/hsbne_rfid_reader/hsbne_rfid_reader.h"
 
 namespace esphome {
 namespace st7796s {
@@ -32,6 +33,8 @@ static const uint8_t ST77XX_TEOFF = 0x34;
 static const uint8_t ST77XX_TEON = 0x35;
 static const uint8_t ST77XX_MADCTL = 0x36;
 static const uint8_t ST77XX_COLMOD = 0x3A;
+
+static const uint8_t ST77XX_WRMEMC = 0x3C;
 
 static const uint8_t ST77XX_MADCTL_MY = 0x80;
 static const uint8_t ST77XX_MADCTL_MX = 0x40;
@@ -65,7 +68,7 @@ static const uint8_t ST7796S_CSCON   = 0xF0; // Command Set Control
 static const uint8_t PROGMEM
 
   BCMD[] = {
-    16,
+    19,
     ST77XX_SWRESET, ST_CMD_DELAY, 120, 
     ST77XX_SLPOUT,  ST_CMD_DELAY, 120, 
     ST7796S_CSCON,   1, 0xC3,  // Enable extension command 2 partI
@@ -93,7 +96,12 @@ static const uint8_t PROGMEM
                       120,
     ST7796S_CSCON,   1, 0x3C, //Command Set control // Disable extension command 2 partI
     ST7796S_CSCON,   1, 0x69, //Command Set control // Disable extension command 2 partII
+    ST77XX_NORON, ST_CMD_DELAY, 10,
     ST77XX_SLPOUT,  ST_CMD_DELAY, 120,    // Exit sleep mode
+    ST77XX_MADCTL,  1,              // 14: Mem access ctl (directions), 1 arg:
+      0xC8,                         //     row/col addr, bottom-top refresh
+    ST77XX_COLMOD,  1,              // 15: set color mode, 1 arg, no delay:
+      0x05,
     ST77XX_DISPON,  ST_CMD_DELAY,  20,    // Set display on
   };                        //     255 = max (500 ms) delay
 
@@ -167,7 +175,8 @@ void ST7796S::setup() {
   data = RGB565_2BYTE;
   sendcommand_(ST77XX_COLMOD, &data, 1);
 
-  data = MAD_MX|MAD_MH|MAD_RGB;
+  data = MAD_MX|MAD_MH|MAD_BGR;
+  ESP_LOGD(TAG, "MADCTL: %i", data);
   sendcommand_(ST77XX_MADCTL, &data, 1);
 
   if (this->invert_colors_)
@@ -198,16 +207,16 @@ size_t ST7796S::get_buffer_length() {
 }
 
 void HOT ST7796S::draw_absolute_pixel_internal(int x, int y, Color color) {
-  // if (x >= this->get_width_internal() || x < 0 || y >= this->get_height_internal() || y < 0)
-  //   return;
+   if (x >= this->get_width_internal() || x < 0 || y >= this->get_height_internal() || y < 0)
+     return;
 
   if (this->eightbitcolor_) {
     const uint32_t color332 = display::ColorUtil::color_to_332(color);
-    uint16_t pos = (x + y * this->get_width_internal());
+    uint32_t pos = (x + y * this->get_width_internal());
     this->buffer_[pos] = color332;
   } else {
     const uint32_t color565 = display::ColorUtil::color_to_565(color);
-    uint16_t pos = (x + y * this->get_width_internal()) * 2;
+    uint32_t pos = (x + y * this->get_width_internal()) * 2;
     this->buffer_[pos++] = (color565 >> 8) & 0xff;
     this->buffer_[pos] = color565 & 0xff;
   }
@@ -265,6 +274,7 @@ void ST7796S::dump_config() {
   ESP_LOGD(TAG, "  Width: %d", this->width_);
   ESP_LOGD(TAG, "  ColStart: %d", this->colstart_);
   ESP_LOGD(TAG, "  RowStart: %d", this->rowstart_);
+  ESP_LOGD(TAG, "  8bit: %d", this->eightbitcolor_);
   LOG_UPDATE_INTERVAL(this);
 }
 
